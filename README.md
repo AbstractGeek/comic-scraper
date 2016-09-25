@@ -1,4 +1,4 @@
-# Comic-Scrapper
+# Comic-Scrapper (Comic Downloader)
 Downloads comics from various websites and creates cbz files from them.
 Currently supports just readcomics.tv
 
