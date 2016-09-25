@@ -35,28 +35,29 @@ def readcomics_extract_chapters(url):
     return chapters
 
 
-def readcomics_download_chapter(url, chapter_num):
+def readcomics_download_chapter(url, chapter_num, download_location):
     chapter_name = 'chapter-' + str(chapter_num)
+    chapter_location = os.path.join(download_location, chapter_name)
     r = requests.get(url)
     soup = bsoup.BeautifulSoup(r.text, 'html.parser')
     images = [image.get('src') for image in soup.find_all(
         'img', attrs={'class': "chapter_img"})]
     filenames = [
-        os.path.join(chapter_name, '%0.3d.jpg' % (i))
+        os.path.join(chapter_location, '%0.3d.jpg' % (i))
         for i in range(len(images))]
     urls = zip(images, filenames)
     # Create chapter folder
-    if not os.path.exists(chapter_name):
-        os.makedirs(chapter_name)
+    if not os.path.exists(chapter_location):
+        os.makedirs(chapter_location)
     # Start downloading the urls
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         for image, filename in urls:
             executor.submit(download_image, image, filename)
     # Convert the folder to a comic book zip filename
     subprocess.check_output(
-        ['zip', '-r', chapter_name + '.cbz', chapter_name],
+        ['zip', '-r', chapter_location + '.cbz', chapter_location],
         stderr=subprocess.STDOUT)
-    shutil.rmtree(chapter_name)
+    shutil.rmtree(chapter_location)
     print(chapter_name + ': Downloaded')
 
 
@@ -73,17 +74,23 @@ def main():
 
     parser.add_argument('urls', metavar='url', nargs='+',
                         help='Comic urls to download')
+    parser.add_argument(
+        "-l", "--location", default=os.getcwd(), help="set download location")
 
     args = parser.parse_args()
 
     for url in args.urls:
-        print('Downloading comic:' + url.split('/')[-1])
+        comic = url.split('/')[-1]
+        print('Downloading comic: ' + comic)
         if 'readcomics.tv' in url:
             chapters = readcomics_extract_chapters(url)
 
         if 'readcomics.tv' in url:
             for k in chapters:
-                readcomics_download_chapter(chapters[k], k)
+                download_location = os.path.join(args.location, comic)
+                if not os.path.exists(download_location):
+                    os.makedirs(download_location)
+                readcomics_download_chapter(chapters[k], k, download_location)
 
         print('Downloaded comic:' + url.split('/')[-1])
 
