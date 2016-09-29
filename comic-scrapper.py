@@ -3,7 +3,6 @@ import argparse
 import bs4 as bsoup
 import requests
 from collections import defaultdict
-# from pprint import pprint
 import shutil
 import os
 import concurrent.futures
@@ -50,7 +49,7 @@ def readcomics_download_chapter(url, chapter_num, download_location):
     if not os.path.exists(chapter_location):
         os.makedirs(chapter_location)
     # Start downloading the urls
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         for image, filename in urls:
             executor.submit(download_image, image, filename)
     # Convert the folder to a comic book zip filename
@@ -76,17 +75,41 @@ def main():
                         help='Comic urls to download')
     parser.add_argument(
         "-l", "--location", default=os.getcwd(), help="set download location")
+    parser.add_argument(
+        "-c", "--chapters", default=False,
+        help="Specify chapters to download separated by : (10:20).")
 
     args = parser.parse_args()
 
     for url in args.urls:
         comic = url.split('/')[-1]
         print('Downloading comic: ' + comic)
+
+        # Extract chapters
         if 'readcomics.tv' in url:
             chapters = readcomics_extract_chapters(url)
 
+        # Get chapters to download
+        if args.chapters:
+            try:
+                start_stop = args.chapters.split(':')
+                if len(start_stop) == 1:
+                    keys = [int(start_stop)]
+                elif len(start_stop) == 2:
+                    keys = list(range(
+                        int(start_stop[0]), int(start_stop[1])+1, 1))
+                else:
+                    raise SyntaxError(
+                        "Chapter inputs should be separated by ':'")
+            except TypeError:
+                raise SyntaxError("Chapter inputs should be separated by ':'")
+                exit()
+        else:
+            keys = chapters.keys
+
+        # Download chapters
         if 'readcomics.tv' in url:
-            for k in chapters:
+            for k in keys:
                 download_location = os.path.join(args.location, comic)
                 if not os.path.exists(download_location):
                     os.makedirs(download_location)
