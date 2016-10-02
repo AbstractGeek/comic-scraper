@@ -6,7 +6,7 @@ from collections import defaultdict
 import shutil
 import os
 import concurrent.futures
-import subprocess
+from zipfile import ZipFile, ZIP_DEFLATED
 
 
 def download_image(url, filename):
@@ -14,6 +14,18 @@ def download_image(url, filename):
     with open(filename, 'wb') as out_file:
         shutil.copyfileobj(response.raw, out_file)
     del response
+
+
+def zipdir(folder, filename):
+    assert os.path.isdir(folder)
+    zipf = ZipFile(filename, 'w', ZIP_DEFLATED)
+    for root, dirs, files in os.walk(folder):
+        # note: ignore empty directories
+        for fn in files:
+            zipf.write(
+                os.path.join(root, fn),
+                os.path.relpath(os.path.join(root, fn), folder))
+    zipf.close()
 
 
 def readcomics_extract_chapters(url):
@@ -53,9 +65,7 @@ def readcomics_download_chapter(url, chapter_num, download_location):
         for image, filename in urls:
             executor.submit(download_image, image, filename)
     # Convert the folder to a comic book zip filename
-    subprocess.check_output(
-        ['zip', '-r', chapter_location + '.cbz', chapter_location],
-        stderr=subprocess.STDOUT)
+    zipdir(chapter_location, chapter_location + '.cbz')
     shutil.rmtree(chapter_location)
     print(chapter_name + ': Downloaded')
 
@@ -110,7 +120,8 @@ def main():
         # Download chapters
         if 'readcomics.tv' in url:
             for k in keys:
-                download_location = os.path.join(args.location, comic)
+                download_location = os.path.abspath(
+                    os.path.join(args.location, comic))
                 if not os.path.exists(download_location):
                     os.makedirs(download_location)
                 readcomics_download_chapter(chapters[k], k, download_location)
