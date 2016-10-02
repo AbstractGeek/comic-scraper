@@ -1,6 +1,6 @@
 from setuptools import setup
 
-setup(name='comic_scrapper',
+setup(name='comic-scrapper',
       version='0.1',
       description='Scraps comics and creates cbz files',
       url='https://github.com/AbstractGeek/comic-scrapper',
