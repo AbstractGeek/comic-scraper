@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import argparse
 import bs4 as bsoup
 import requests
@@ -115,7 +115,7 @@ def main():
                 raise SyntaxError("Chapter inputs should be separated by ':'")
                 exit()
         else:
-            keys = chapters.keys
+            keys = chapters.keys()
 
         # Download chapters
         if 'readcomics.tv' in url:
