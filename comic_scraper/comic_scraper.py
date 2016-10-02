@@ -75,8 +75,8 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             'Downloads all comics from'
-            'the given url (currently works only with readcomics.tv).'
-            ' Example - A url input'
+            'the given url (currently works only with readcomics.tv). '
+            ' Example - A url input '
             ' http://www.readcomics.tv/comic/spider-man-2016 looks '
             'for the spider-man-2016 comics in the url, downloads them all, '
             'and makes cbz files of all issues.'))
