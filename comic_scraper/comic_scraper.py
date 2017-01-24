@@ -2,7 +2,7 @@
 import argparse
 import bs4 as bsoup
 import requests
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import shutil
 import os
 import re
@@ -49,9 +49,10 @@ class Comic:
             keys = list(self.all_chapters.keys())
 
         # Sort keys to make it ascending order and make it a new dict
-        keys.sort()
-        self.chapters_to_download = {key: self.all_chapters[key]
-                                     for key in keys}
+        unsorted_chapters = {key: self.all_chapters[key]
+                             for key in keys}
+        self.chapters_to_download = OrderedDict(
+            sorted(unsorted_chapters.items(), key=lambda t: t[0]))
         # Print downloading chapters
         print("Downloading the below chapters:")
         print(keys)
@@ -77,7 +78,7 @@ class Comic:
         r = requests.get(url)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
 
-        chapters = defaultdict(defaultdict)
+        chapters = defaultdict(Chapter)
         links = [link.get('href')
                  for link in soup.find_all('a')
                  if link.get('href') and
@@ -103,7 +104,7 @@ class Comic:
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
         volume_num = 1
 
-        chapters = defaultdict(defaultdict)
+        chapters = defaultdict(Chapter)
         for link in soup.find_all('a'):
             if (comic in link.get('href')) and ('chapter' in link.get('href')):
                 chapter = link.get('href')
