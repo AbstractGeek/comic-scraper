@@ -11,31 +11,37 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from random import shuffle, uniform
 from numpy import arange
 from time import sleep
+from copy import deepcopy
 
 
 class Comic:
-    def __init__(self, comic_url, root_dir):
+    def __init__(self, comic_url, program_args):
         self.url = comic_url
         self.name = comic_url.split('/')[-1] \
             if comic_url.split('/')[-1] else comic_url.split('/')[-2]
         # Set download location
         self.download_location = os.path.abspath(
-            os.path.join(root_dir, self.name))
+            os.path.join(program_args.location, self.name))
         if not os.path.exists(self.download_location):
             os.makedirs(self.download_location)
+        # Set threads and retry values
+        self.chapter_threads = program_args.chapterthreads
+        self.page_threads = program_args.pagethreads
+        self.wait_time = program_args.waittime
+        self.max_retries = program_args.retries
         # Get all chapters and mode of download
         self.all_chapters = self.get_chapters()
 
     def get_chapters(self):
         if 'mangafox' in self.url:
             self.mode = ['manga', 'mangafox']
-            chapters = self.manga_extract_chapters(self.url)
+            chapters = self.manga_extract_chapters()
         elif 'mangahere' in self.url:
             self.mode = ['manga', 'mangahere']
-            chapters = self.manga_extract_chapters(self.url)
+            chapters = self.manga_extract_chapters()
         elif 'readcomics' in self.url:
             self.mode = ['comic']
-            chapters = self.comic_extract_chapters(self.url)
+            chapters = self.comic_extract_chapters()
         else:
             raise ValueError('The scraper currently only supports mangafox, ',
                              'mangahere and readcomics.tv ',
@@ -55,10 +61,11 @@ class Comic:
             sorted(unsorted_chapters.items(), key=lambda t: t[0]))
         # Print downloading chapters
         print("Downloading the below chapters:")
-        print(keys)
+        print(sorted(keys))
 
     def download_comic(self):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.chapter_threads) as executor:
             future_to_chapter = {
                 executor.submit(chapter.download_chapter): chapter_num
                 for chapter_num, chapter in self.chapters_to_download.items()}
@@ -73,8 +80,9 @@ class Comic:
                 else:
                     print('Downloaded: Chapter-%g' % (chapter_num))
 
-    def manga_extract_chapters(self, url):
+    def manga_extract_chapters(self):
         comic_name = self.name
+        url = self.url
         r = requests.get(url)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
 
@@ -98,7 +106,8 @@ class Comic:
                         self, chapter_num, volume_num, chapter_link)
         return chapters
 
-    def comic_extract_chapters(self, url):
+    def comic_extract_chapters(self):
+        url = self.url
         comic = url.split('/')[-1]
         r = requests.get(url)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
@@ -130,6 +139,10 @@ class Chapter:
         self.chapter_num = chapter_num
         self.volume_num = volume_num
         self.chapter_url = chapter_url
+        # Threads and retry time
+        self.page_threads = comic.page_threads
+        self.wait_time = comic.wait_time
+        self.max_retries = comic.max_retries
 
     def download_chapter(self):
         ''' Download and convert it into a cbz file '''
@@ -144,7 +157,8 @@ class Chapter:
             os.makedirs(self.chapter_location)
 
         # Download individual pages in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.page_threads) as executor:
             executor.map(download_func, pages)
 
         # Convert the folder to a comic book zip filename
@@ -178,8 +192,8 @@ class Chapter:
         elif (self.comic_mode[1] == 'mangahere'):
             base_url = self.chapter_url
 
-        max_retries = 5
-        wait_retry_time = 5
+        max_retries = deepcopy(self.max_retries)
+        wait_retry_time = deepcopy(self.wait_time)
 
         while True:
             # Get javascript blocks
@@ -232,8 +246,8 @@ class Chapter:
         filename = os.path.join(self.chapter_location,
                                 '%0.3d.jpg' % (page_num))
 
-        max_retries = 10
-        wait_retry_time = 10
+        max_retries = deepcopy(self.max_retries)
+        wait_retry_time = deepcopy(self.wait_time)
 
         while True:
             r = requests.get(page_url)
@@ -303,11 +317,23 @@ def main():
     parser.add_argument(
         "-c", "--chapters", default=False,
         help="Specify chapters to download separated by : (10:20).")
+    parser.add_argument(
+        "-ct", "--chapterthreads", default=5,
+        help="Number of parallel chapters downloads.")
+    parser.add_argument(
+        "-pt", "--pagethreads", default=10,
+        help="Number of parallel chapter pages downloads (per chapter).")
+    parser.add_argument(
+        "-wt", "--waittime", default=10,
+        help="Wait time before retry if encountered with an error")
+    parser.add_argument(
+        "-rt", "--retries", default=10,
+        help="Number of retries before giving up")
 
     args = parser.parse_args()
 
     for url in args.urls:
-        comic = Comic(url, args.location)
+        comic = Comic(url, args)
         print('Downloading comic: ' + comic.name)
 
         # Get chapters to download
