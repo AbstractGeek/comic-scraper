@@ -144,7 +144,7 @@ class Chapter:
             os.makedirs(self.chapter_location)
 
         # Download individual pages in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             executor.map(download_func, pages)
 
         # Convert the folder to a comic book zip filename
@@ -232,8 +232,8 @@ class Chapter:
         filename = os.path.join(self.chapter_location,
                                 '%0.3d.jpg' % (page_num))
 
-        max_retries = 5
-        wait_retry_time = 5
+        max_retries = 10
+        wait_retry_time = 10
 
         while True:
             r = requests.get(page_url)
