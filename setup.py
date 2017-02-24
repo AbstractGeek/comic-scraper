@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(name='comic-scraper',
-      version='0.5',
-      description='Scraps comics and creates cbz files',
+      version='0.5.1',
+      description='Scraps comics,mangas and creates cbz files for offline reading',
       url='https://github.com/AbstractGeek/comic-scraper',
-      download_url='https://github.com/AbstractGeek/comic-scraper/tarball/0.5',
+      download_url='https://github.com/AbstractGeek/comic-scraper/tarball/0.5.1',
       author='Dinesh Natesan',
       author_email='abstractgeek@outlook.com',
       license='MIT',
@@ -19,7 +19,8 @@ setup(name='comic-scraper',
       install_requires=[
           'beautifulsoup4',
           'futures',
-          'requests==2.9.1'
+          'requests',
+          'numpy'
       ],
       entry_points={
         'console_scripts':
