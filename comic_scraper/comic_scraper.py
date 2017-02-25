@@ -9,9 +9,11 @@ import re
 import concurrent.futures
 from zipfile import ZipFile, ZIP_DEFLATED
 from random import shuffle, uniform
-from numpy import arange
 from time import sleep
 from copy import deepcopy
+from fpdf import FPDF
+from PIL import Image
+from PyPDF2 import PdfFileMerger
 
 
 class Comic:
@@ -29,6 +31,7 @@ class Comic:
         self.page_threads = program_args.pagethreads
         self.wait_time = program_args.waittime
         self.max_retries = program_args.retries
+        self.file_format = program_args.format
         # Get all chapters and mode of download
         self.all_chapters = self.get_chapters()
 
@@ -143,6 +146,7 @@ class Chapter:
         self.page_threads = comic.page_threads
         self.wait_time = comic.wait_time
         self.max_retries = comic.max_retries
+        self.comic_file_format = comic.file_format
 
     def download_chapter(self):
         ''' Download and convert it into a cbz file '''
@@ -170,8 +174,11 @@ class Chapter:
             chapter_name = os.path.join(
                 self.comic_download_location, '%s-%g.cbz'
                 % (self.comic_name, self.chapter_num))
-
-        zipdir(self.chapter_location, chapter_name)
+        
+        if self.comic_file_format == 'pdf':
+            pdfdir(self.chapter_location, chapter_name)
+        else:
+            zipdir(self.chapter_location, chapter_name)
         shutil.rmtree(self.chapter_location)
 
     def initialize_chapter_download(self):
@@ -298,6 +305,39 @@ def zipdir(folder, filename):
                 os.path.relpath(os.path.join(root, fn), folder))
     zipf.close()
 
+def pdfdir(folder, filename):
+    assert os.path.isdir(folder)
+    for root, dirs, files in os.walk(folder):
+        pass
+    
+    for fn in files:
+        im=Image.open(folder + os.sep + fn)
+        width, height = im.size
+        pdf = FPDF(unit = "pt", format = [width, height])
+        pdf.add_page()
+        pdf.image(folder + os.sep + fn, 0, 0)
+        pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
+
+    merger = PdfFileMerger()
+    for fn in files: 
+        merger.append(open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
+        
+    merge_file = open(filename.rsplit('.', 1)[0] + '.pdf','wb')
+    merger.write(merge_file)
+    
+   
+
+#        cover = Image.open(folder + os.sep + fn)
+#        width, height = cover.size
+#        pdf = FPDF(unit = "pt", format = [width, height])
+#        pdf.add_page()
+#        pdf.image(folder + os.sep + fn, 0, 0)
+#        pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
+#        
+#    merger = PdfFileMerger()
+#    for fn in files:
+#        merger.append(open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
+#    merger.write(filename.rsplit('.', 1)[0] + '.pdf')
 
 def main():
     # parse input
@@ -329,6 +369,9 @@ def main():
     parser.add_argument(
         "-rt", "--retries", default=10,
         help="Number of retries before giving up")
+    parser.add_argument(
+        "-f", "--format", default='cbz',
+        help="File format of the downloaded file, supported .PDF and .CBZ")
 
     args = parser.parse_args()
 
@@ -343,8 +386,7 @@ def main():
                 if len(start_stop) == 1:
                     potential_keys = [float(start_stop[0])]
                 elif len(start_stop) == 2:
-                    potential_keys = list(arange(
-                        float(start_stop[0]), float(start_stop[1])+0.5, 0.5))
+                    potential_keys = [i*0.5 for i in range(2*int(start_stop[0]), 2*int(start_stop[1])+1)]
                 else:
                     raise SyntaxError(
                         "Chapter inputs should be separated by ':'")
@@ -359,6 +401,7 @@ def main():
         comic.download_comic()
         print('Downloaded comic:' + url.split('/')[-1])
 
-
+        
+        
 if __name__ == '__main__':
     main()
