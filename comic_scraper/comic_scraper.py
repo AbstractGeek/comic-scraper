@@ -7,17 +7,21 @@ import shutil
 import os
 import re
 import concurrent.futures
+from urllib.parse import urlparse, urljoin
 from zipfile import ZipFile, ZIP_DEFLATED
 from random import shuffle, uniform
 from time import sleep
 from copy import deepcopy
-from fpdf import FPDF
-from PIL import Image
-from PyPDF2 import PdfFileMerger
+#from fpdf import FPDF
+#from PIL import Image
+#from PyPDF2 import PdfFileMerger
 
 
 class Comic:
+    """Comic class. Contains chapters."""
+
     def __init__(self, comic_url, program_args):
+        """Init function. Creates chapters for the given comic."""
         self.url = comic_url
         self.name = comic_url.split('/')[-1] \
             if comic_url.split('/')[-1] else comic_url.split('/')[-2]
@@ -36,6 +40,7 @@ class Comic:
         self.all_chapters = self.get_chapters()
 
     def get_chapters(self):
+        """Get list of chapters."""
         if 'mangafox' in self.url:
             self.mode = ['manga', 'mangafox']
             chapters = self.manga_extract_chapters()
@@ -52,6 +57,7 @@ class Comic:
         return chapters
 
     def set_download_chapters(self, potential_keys=None):
+        """Set chapters to download."""
         if potential_keys:
             keys = list(set(potential_keys) & set(self.all_chapters.keys()))
         else:
@@ -67,6 +73,7 @@ class Comic:
         print(sorted(keys))
 
     def download_comic(self):
+        """Begin download the chapters in the comic."""
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.chapter_threads) as executor:
             future_to_chapter = {
@@ -84,8 +91,12 @@ class Comic:
                     print('Downloaded: Chapter-%g' % (chapter_num))
 
     def manga_extract_chapters(self):
+        """Extract chapters if the comic is a manga."""
         comic_name = self.name
         url = self.url
+        urlscheme = urlparse(url)
+
+        # Get chapters
         r = requests.get(url)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
 
@@ -97,7 +108,8 @@ class Comic:
                  ('manga' in link.get('href'))]
 
         for link in links:
-            chapter_link = '/'.join(link.split('/')[:-1])
+            chapter_link = urljoin(urlscheme.scheme + "://" + urlscheme.netloc,
+                                   '/'.join(link.split('/')[:-1]))
             matched_groups = re.search('v(\d*)/c([\d \.]*)', chapter_link)
             if matched_groups:
                 volume_num = int(matched_groups.group(1))
@@ -110,6 +122,7 @@ class Comic:
         return chapters
 
     def comic_extract_chapters(self):
+        """Extract chapters if it is a comic."""
         url = self.url
         comic = url.split('/')[-1]
         r = requests.get(url)
@@ -133,8 +146,11 @@ class Comic:
 
 
 class Chapter:
+    """Chapter class. Contains pages."""
+
     def __init__(self, comic, chapter_num, volume_num, chapter_url):
-        # Extract necessay information from the comic object
+        """Initialize constants required for download."""
+        # Extract necessary information from the comic object
         self.comic_name = comic.name
         self.comic_download_location = comic.download_location
         self.comic_mode = comic.mode
@@ -149,7 +165,7 @@ class Chapter:
         self.comic_file_format = comic.file_format
 
     def download_chapter(self):
-        ''' Download and convert it into a cbz file '''
+        """Download and convert it into a cbz file."""
         init_status, pages, download_func = self.initialize_chapter_download()
 
         if not init_status:
@@ -174,7 +190,7 @@ class Chapter:
             chapter_name = os.path.join(
                 self.comic_download_location, '%s-%g.cbz'
                 % (self.comic_name, self.chapter_num))
-        
+
         if self.comic_file_format == 'pdf':
             pdfdir(self.chapter_location, chapter_name)
         else:
@@ -182,7 +198,7 @@ class Chapter:
         shutil.rmtree(self.chapter_location)
 
     def initialize_chapter_download(self):
-        ''' Obtain pages and function based on the mode '''
+        """Obtain pages and function based on the mode."""
         if self.comic_mode[0] == 'manga':
             init_status, pages = self.manga_get_pages()
             func = self.manga_download_page
@@ -193,6 +209,7 @@ class Chapter:
         return init_status, pages, func
 
     def manga_get_pages(self):
+        """Obtain list of pages in a manga chapter."""
         # Get base url
         if (self.comic_mode[1] == 'mangafox'):
             base_url = self.chapter_url + '/1.html'
@@ -220,9 +237,9 @@ class Chapter:
                             total_pages = int(matched_groups.group(1))
                             break
                 # Get page urls
-                page_urls = ["%s/%d.html" % (self.chapter_url, i+1)
+                page_urls = ["%s/%d.html" % (self.chapter_url, i + 1)
                              for i in range(total_pages)]
-                page_num = [i+1 for i in range(total_pages)]
+                page_num = [i + 1 for i in range(total_pages)]
                 pages = list(zip(page_urls, page_num))
                 shuffle(pages)
 
@@ -230,25 +247,26 @@ class Chapter:
 
             elif (max_retries > 0):
                 # Idea from manga_downloader (which in turn was from wget)
-                sleep(uniform(0.5*wait_retry_time, 1.5*wait_retry_time))
+                sleep(uniform(0.5 * wait_retry_time, 1.5 * wait_retry_time))
                 max_retries -= 1
             else:
                 return False, None
 
     def comic_get_pages(self):
+        """Obtain list of pages in a comic chapter."""
         url = self.chapter_url
         r = requests.get(url)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
         images = [image.get('src') for image in soup.find_all(
             'img', attrs={'class': "chapter_img"})]
-        page_num = [i+1 for i in range(len(images))]
+        page_num = [i + 1 for i in range(len(images))]
         pages = list(zip(images, page_num))
         shuffle(pages)
 
         return True, pages
 
     def manga_download_page(self, page):
-        ''' Downloads individual pages in a manga '''
+        """Download individual pages in a manga."""
         page_url, page_num = page
         filename = os.path.join(self.chapter_location,
                                 '%0.3d.jpg' % (page_num))
@@ -266,7 +284,7 @@ class Chapter:
                 return True
             elif (max_retries > 0):
                 # Idea from manga_downloader (which in turn was from wget)
-                sleep(uniform(0.5*wait_retry_time, 1.5*wait_retry_time))
+                sleep(uniform(0.5 * wait_retry_time, 1.5 * wait_retry_time))
                 max_retries -= 1
             else:
                 print("Failed download: Chapter-%g, page-%d"
@@ -278,7 +296,7 @@ class Chapter:
                 return False
 
     def comic_download_page(self, page):
-        ''' Downloads individual pages in a manga '''
+        """Download individual pages in a comic."""
         image, page_num = page
         filename = os.path.join(self.chapter_location,
                                 '%0.3d.jpg' % (page_num))
@@ -288,6 +306,7 @@ class Chapter:
 
 
 def download_image(url, filename):
+    """Download image (url) and save (filename)."""
     response = requests.get(url, stream=True)
     with open(filename, 'wb') as out_file:
         shutil.copyfileobj(response.raw, out_file)
@@ -295,6 +314,7 @@ def download_image(url, filename):
 
 
 def zipdir(folder, filename):
+    """Zip folder."""
     assert os.path.isdir(folder)
     zipf = ZipFile(filename, 'w', ZIP_DEFLATED)
     for root, dirs, files in os.walk(folder):
@@ -305,27 +325,29 @@ def zipdir(folder, filename):
                 os.path.relpath(os.path.join(root, fn), folder))
     zipf.close()
 
+
 def pdfdir(folder, filename):
+    """Create PDF of images in the folder."""
     assert os.path.isdir(folder)
     for root, dirs, files in os.walk(folder):
         pass
-    
+
     for fn in files:
-        im=Image.open(folder + os.sep + fn)
+        im = Image.open(folder + os.sep + fn)
         width, height = im.size
-        pdf = FPDF(unit = "pt", format = [width, height])
+        pdf = FPDF(unit="pt", format=[width, height])
         pdf.add_page()
         pdf.image(folder + os.sep + fn, 0, 0)
         pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
 
     merger = PdfFileMerger()
-    for fn in files: 
-        merger.append(open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
-        
-    merge_file = open(filename.rsplit('.', 1)[0] + '.pdf','wb')
+    for fn in files:
+        merger.append(
+            open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
+
+    merge_file = open(filename.rsplit('.', 1)[0] + '.pdf', 'wb')
     merger.write(merge_file)
-    
-   
+
 
 #        cover = Image.open(folder + os.sep + fn)
 #        width, height = cover.size
@@ -333,14 +355,14 @@ def pdfdir(folder, filename):
 #        pdf.add_page()
 #        pdf.image(folder + os.sep + fn, 0, 0)
 #        pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
-#        
+#
 #    merger = PdfFileMerger()
 #    for fn in files:
 #        merger.append(open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
 #    merger.write(filename.rsplit('.', 1)[0] + '.pdf')
 
 def main():
-    # parse input
+    """Parse input and download comic(s)."""
     parser = argparse.ArgumentParser(
         description=(
             'Downloads all manga chapters from'
@@ -367,11 +389,11 @@ def main():
         "-wt", "--waittime", default=10,
         help="Wait time before retry if encountered with an error")
     parser.add_argument(
-        "-rt", "--retries", default=10,
+        "-rt", "--retries", default=30,
         help="Number of retries before giving up")
     parser.add_argument(
         "-f", "--format", default='cbz',
-        help="File format of the downloaded file, supported .PDF and .CBZ")
+        help="File format of the downloaded file, supported 'pdf' and 'cbz'")
 
     args = parser.parse_args()
 
@@ -386,7 +408,9 @@ def main():
                 if len(start_stop) == 1:
                     potential_keys = [float(start_stop[0])]
                 elif len(start_stop) == 2:
-                    potential_keys = [i*0.5 for i in range(2*int(start_stop[0]), 2*int(start_stop[1])+1)]
+                    potential_keys = [
+                        i * 0.5 for i in range(2 * int(start_stop[0]),
+                                               2 * int(start_stop[1]) + 1)]
                 else:
                     raise SyntaxError(
                         "Chapter inputs should be separated by ':'")
@@ -401,7 +425,6 @@ def main():
         comic.download_comic()
         print('Downloaded comic:' + url.split('/')[-1])
 
-        
-        
+
 if __name__ == '__main__':
     main()
