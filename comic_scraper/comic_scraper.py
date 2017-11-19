@@ -120,6 +120,23 @@ class Comic:
                 else:
                     chapters[chapter_num] = Chapter(
                         self, chapter_num, volume_num, chapter_link)
+
+        if (not chapters) and links:
+            # Maybe the manga has no volume (try this out)
+            for link in links:
+                chapter_link = urljoin(urlscheme.scheme
+                                       + "://" + urlscheme.netloc,
+                                       '/'.join(link.split('/')[:-1]))
+                matched_groups = re.search('c([\d \.]+)', chapter_link)
+                if matched_groups:
+                    volume_num = 1
+                    chapter_num = float(matched_groups.group(1))
+                    if chapter_num in chapters:
+                        continue
+                    else:
+                        chapters[chapter_num] = Chapter(
+                            self, chapter_num, volume_num, chapter_link)
+
         return chapters
 
     def comic_extract_chapters(self):
@@ -370,7 +387,7 @@ def main():
         "-rt", "--retries", default=10,
         help="Number of retries before giving up")
     parser.add_argument(
-        "-f", "--format", default='cbz',
+        "-f", "--format", default='pdf',
         help="File format of the downloaded file, supported 'pdf' and 'cbz'")
 
     args = parser.parse_args()
