@@ -12,9 +12,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from random import shuffle, uniform
 from time import sleep
 from copy import deepcopy
-#from fpdf import FPDF
-#from PIL import Image
-#from PyPDF2 import PdfFileMerger
+import img2pdf
 
 
 class Comic:
@@ -184,17 +182,17 @@ class Chapter:
         # Convert the folder to a comic book zip filename
         if self.comic_mode[0] == 'manga':
             chapter_name = os.path.join(
-                self.comic_download_location, '%s-%g (v%d).cbz'
+                self.comic_download_location, '%s-%g (v%d)'
                 % (self.comic_name, self.chapter_num, self.volume_num))
         elif self.comic_mode[0] == 'comic':
             chapter_name = os.path.join(
-                self.comic_download_location, '%s-%g.cbz'
+                self.comic_download_location, '%s-%g'
                 % (self.comic_name, self.chapter_num))
 
         if self.comic_file_format == 'pdf':
-            pdfdir(self.chapter_location, chapter_name)
-        else:
-            zipdir(self.chapter_location, chapter_name)
+            pdfdir(self.chapter_location, chapter_name + ".pdf")
+        elif self.comic_file_format == 'cbz':
+            zipdir(self.chapter_location, chapter_name + ".cbz")
         shutil.rmtree(self.chapter_location)
 
     def initialize_chapter_download(self):
@@ -329,37 +327,12 @@ def zipdir(folder, filename):
 def pdfdir(folder, filename):
     """Create PDF of images in the folder."""
     assert os.path.isdir(folder)
-    for root, dirs, files in os.walk(folder):
-        pass
+    with open(filename, "wb") as f:
+        for root, dirs, files in os.walk(folder):
+            # Convert images to pdf
+            f.write(img2pdf.convert(
+                [os.path.join(root, fn) for fn in files]))
 
-    for fn in files:
-        im = Image.open(folder + os.sep + fn)
-        width, height = im.size
-        pdf = FPDF(unit="pt", format=[width, height])
-        pdf.add_page()
-        pdf.image(folder + os.sep + fn, 0, 0)
-        pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
-
-    merger = PdfFileMerger()
-    for fn in files:
-        merger.append(
-            open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
-
-    merge_file = open(filename.rsplit('.', 1)[0] + '.pdf', 'wb')
-    merger.write(merge_file)
-
-
-#        cover = Image.open(folder + os.sep + fn)
-#        width, height = cover.size
-#        pdf = FPDF(unit = "pt", format = [width, height])
-#        pdf.add_page()
-#        pdf.image(folder + os.sep + fn, 0, 0)
-#        pdf.output(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'F')
-#
-#    merger = PdfFileMerger()
-#    for fn in files:
-#        merger.append(open(folder + os.sep + fn.rsplit('.', 1)[0] + '.pdf', 'rb'))
-#    merger.write(filename.rsplit('.', 1)[0] + '.pdf')
 
 def main():
     """Parse input and download comic(s)."""
@@ -380,16 +353,16 @@ def main():
         "-c", "--chapters", default=False,
         help="Specify chapters to download separated by : (10:20).")
     parser.add_argument(
-        "-ct", "--chapterthreads", default=5,
+        "-ct", "--chapterthreads", default=2,
         help="Number of parallel chapters downloads.")
     parser.add_argument(
         "-pt", "--pagethreads", default=10,
         help="Number of parallel chapter pages downloads (per chapter).")
     parser.add_argument(
-        "-wt", "--waittime", default=10,
+        "-wt", "--waittime", default=15,
         help="Wait time before retry if encountered with an error")
     parser.add_argument(
-        "-rt", "--retries", default=30,
+        "-rt", "--retries", default=10,
         help="Number of retries before giving up")
     parser.add_argument(
         "-f", "--format", default='cbz',
