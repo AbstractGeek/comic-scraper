@@ -8,6 +8,7 @@ import os
 import re
 import concurrent.futures
 from urllib.parse import urlparse, urljoin
+from urllib3.exceptions import InsecureRequestWarning
 from zipfile import ZipFile, ZIP_DEFLATED
 from random import shuffle, uniform
 from time import sleep
@@ -18,7 +19,7 @@ import img2pdf
 class Comic:
     """Comic class. Contains chapters."""
 
-    def __init__(self, comic_url, program_args):
+    def __init__(self, comic_url, program_args, verify_https):
         """Init function. Creates chapters for the given comic."""
         self.url = comic_url
         self.name = comic_url.split('/')[-1] \
@@ -34,6 +35,8 @@ class Comic:
         self.wait_time = program_args.waittime
         self.max_retries = program_args.retries
         self.file_format = program_args.format
+        # Set verify mode
+        self.verify_https = verify_https
         # Get all chapters and mode of download
         self.all_chapters = self.get_chapters()
 
@@ -95,7 +98,7 @@ class Comic:
         urlscheme = urlparse(url)
 
         # Get chapters
-        r = requests.get(url)
+        r = requests.get(url, verify=self.verify_https)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
 
         chapters = defaultdict(Chapter)
@@ -123,7 +126,7 @@ class Comic:
         """Extract chapters if it is a comic."""
         url = self.url
         comic = url.split('/')[-1]
-        r = requests.get(url)
+        r = requests.get(url, verify=self.verify_https)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
         volume_num = 1
 
@@ -161,6 +164,8 @@ class Chapter:
         self.wait_time = comic.wait_time
         self.max_retries = comic.max_retries
         self.comic_file_format = comic.file_format
+        # Set verify mode
+        self.verify_https = comic.verify_https
 
     def download_chapter(self):
         """Download and convert it into a cbz file."""
@@ -219,7 +224,7 @@ class Chapter:
 
         while True:
             # Get javascript blocks
-            r = requests.get(base_url)
+            r = requests.get(base_url, verify=self.verify_https)
             soup = bsoup.BeautifulSoup(r.text, 'html.parser')
             scripts = [script for script in soup.find_all(
                 'script', attrs={'type': 'text/javascript'})]
@@ -253,7 +258,7 @@ class Chapter:
     def comic_get_pages(self):
         """Obtain list of pages in a comic chapter."""
         url = self.chapter_url
-        r = requests.get(url)
+        r = requests.get(url, verify=self.verify_https)
         soup = bsoup.BeautifulSoup(r.text, 'html.parser')
         images = [image.get('src') for image in soup.find_all(
             'img', attrs={'class': "chapter_img"})]
@@ -273,12 +278,12 @@ class Chapter:
         wait_retry_time = deepcopy(self.wait_time)
 
         while True:
-            r = requests.get(page_url)
+            r = requests.get(page_url, verify=self.verify_https)
             soup = bsoup.BeautifulSoup(r.text, 'html.parser')
             img = soup.find_all('img', attrs={'id': 'image'})
             if img:
                 image = img[0].get('src')
-                download_image(image, filename)
+                download_image(image, filename, self.verify_https)
                 return True
             elif (max_retries > 0):
                 # Idea from manga_downloader (which in turn was from wget)
@@ -303,9 +308,9 @@ class Chapter:
         return True
 
 
-def download_image(url, filename):
+def download_image(url, filename, verify_https):
     """Download image (url) and save (filename)."""
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, verify=verify_https)
     with open(filename, 'wb') as out_file:
         shutil.copyfileobj(response.raw, out_file)
     del response
@@ -317,7 +322,7 @@ def zipdir(folder, filename):
     zipf = ZipFile(filename, 'w', ZIP_DEFLATED)
     for root, dirs, files in os.walk(folder):
         # note: ignore empty directories
-        for fn in files:
+        for fn in sorted(files):
             zipf.write(
                 os.path.join(root, fn),
                 os.path.relpath(os.path.join(root, fn), folder))
@@ -331,7 +336,7 @@ def pdfdir(folder, filename):
         for root, dirs, files in os.walk(folder):
             # Convert images to pdf
             f.write(img2pdf.convert(
-                [os.path.join(root, fn) for fn in files]))
+                [os.path.join(root, fn) for fn in sorted(files)]))
 
 
 def main():
@@ -353,7 +358,7 @@ def main():
         "-c", "--chapters", default=False,
         help="Specify chapters to download separated by : (10:20).")
     parser.add_argument(
-        "-ct", "--chapterthreads", default=2,
+        "-ct", "--chapterthreads", default=5,
         help="Number of parallel chapters downloads.")
     parser.add_argument(
         "-pt", "--pagethreads", default=10,
@@ -371,7 +376,21 @@ def main():
     args = parser.parse_args()
 
     for url in args.urls:
-        comic = Comic(url, args)
+        # If https, check before using verify False
+        urlscheme = urlparse(url)
+        verify_https = False
+        if urlscheme.scheme == 'https':
+            try:
+                requests.get(url)
+                verify_https = True
+            except requests.exceptions.SSLError:
+                verify_https = False
+                print('Could not validate https certificate for url:' +
+                      '%s. Proceeding with Insecure certificate.' % (url))
+                requests.packages.urllib3.disable_warnings(
+                    category=InsecureRequestWarning)
+
+        comic = Comic(url, args, verify_https)
         print('Downloading comic: ' + comic.name)
 
         # Get chapters to download
