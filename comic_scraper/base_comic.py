@@ -49,7 +49,7 @@ class BaseComic:
         print(sorted(keys))
 
     def download_comic(self):
-        """Begin download the chapters in the comic."""
+        """Begin download of chapters in the comic."""
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.chapter_threads) as executor:
             future_to_chapter = {
@@ -74,14 +74,13 @@ class BaseComic:
 class BaseChapter:
     """Base Chapter class. Contains pages."""
 
-    def __init__(self, comic, chapter_num, volume_num, chapter_url):
+    def __init__(self, comic, chapter_num, chapter_url):
         """Initialize constants required for download."""
         # Extract necessary information from the comic object
         self.comic_name = comic.name
         self.comic_download_location = comic.download_location
         # Create chapter specific variables
         self.chapter_num = chapter_num
-        self.volume_num = volume_num
         self.chapter_url = chapter_url
         # Threads and retry time
         self.page_threads = comic.page_threads
@@ -113,8 +112,8 @@ class BaseChapter:
 
         # Convert the folder to a comic book zip filename
         chapter_name = os.path.join(
-            self.comic_download_location, '%s-%g (v%d)'
-            % (self.comic_name, self.chapter_num, self.volume_num))
+            self.comic_download_location, '%s-%g'
+            % (self.comic_name, self.chapter_num))
 
         if self.comic_file_format == 'pdf':
             pdfdir(self.chapter_location, chapter_name + ".pdf")
