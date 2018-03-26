@@ -112,7 +112,6 @@ class MangaReaderChapter(BaseChapter):
             soup = bsoup.BeautifulSoup(r.text, 'html.parser')
             for div in soup.find_all('div', {'id':'imgholder'}):
                 if div.get('id'):
-                        print(div)
                         img = div.find_all('img')
                         break
 
