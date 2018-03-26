@@ -110,9 +110,9 @@ class MangaReaderChapter(BaseChapter):
         while True:
             r = requests.get(page_url, verify=self.verify_https)
             soup = bsoup.BeautifulSoup(r.text, 'html.parser')
-            for div in soup.find_all('div'):
-                if div.get('class'):
-                    if div.get('class')[0] == 'page':
+            for div in soup.find_all('div', {'id':'imgholder'}):
+                if div.get('id'):
+                        print(div)
                         img = div.find_all('img')
                         break
 
