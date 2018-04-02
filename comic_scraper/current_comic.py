@@ -3,6 +3,7 @@
 from extractors.mangafox import MangaFoxComic
 from extractors.mangahere import MangaHereComic
 from extractors.mangastream import MangaStreamComic
+from extractors.mangareader import MangaReaderComic
 
 
 def comic(comic_url, args, verify_https):
@@ -13,3 +14,5 @@ def comic(comic_url, args, verify_https):
         return MangaHereComic(comic_url, args, verify_https)
     elif ('mangstream' in comic_url) or ('readms' in comic_url):
         return MangaStreamComic(comic_url, args, verify_https)
+    elif ('mangareader' in comic_url):
+        return MangaReaderComic(comic_url, args, verify_https)
