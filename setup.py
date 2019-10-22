@@ -24,7 +24,7 @@ setup(name='comic-scraper',
           'idna==2.6',
           'img2pdf==0.2.4',
           'olefile==0.44',
-          'Pillow==4.3.0',
+          'Pillow==6.2.0',
           'requests==2.18.4',
           'urllib3==1.22'
       ],
