@@ -25,7 +25,7 @@ setup(name='comic-scraper',
           'img2pdf==0.2.4',
           'olefile==0.44',
           'Pillow==6.2.0',
-          'requests==2.18.4',
+          'requests==2.20.0',
           'urllib3==1.24.2'
       ],
       entry_points={
