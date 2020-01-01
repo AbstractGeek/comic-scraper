@@ -26,7 +26,7 @@ setup(name='comic-scraper',
           'olefile==0.44',
           'Pillow==6.2.0',
           'requests==2.18.4',
-          'urllib3==1.22'
+          'urllib3==1.24.2'
       ],
       entry_points={
           'console_scripts':
