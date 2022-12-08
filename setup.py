@@ -18,7 +18,7 @@ setup(name='comic-scraper',
       packages=['comic_scraper'],
       install_requires=[
           'beautifulsoup4==4.6.0',
-          'certifi==2017.7.27.1',
+          'certifi==2022.12.7',
           'chardet==3.0.4',
           'futures==3.1.1',
           'idna==2.6',
